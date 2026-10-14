@@ -6,7 +6,7 @@ on:
   
   pull_request:
     branches:
-      -main
+      - main
 
 permissions:
   contents: read
@@ -18,10 +18,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@c4
+        uses: actions/checkout@v4
 
       - name: Set up PHP
-        uses: actions/checkout@v4
+        uses: shivammathur/checkout@v4
         with:
           php-version: '8.2'
           coverage: none
@@ -31,7 +31,7 @@ jobs:
 
       - name: Validate PHP Syntax
         shell: bash
-        run:
+        run: |
           set -e 
 
           while IFS= read -r -d '' file; do
@@ -45,6 +45,7 @@ jobs:
             \) -prune -o \
             -type f -name '*.php' -print0)
 
-      - name: Confirm valdation completed
+      - name: Confirm validation completed
         run: echo "All PHP files passed syntax validation"
+ 
  

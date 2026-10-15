@@ -1,0 +1,50 @@
+name: PHP Automated Tests
+on:
+  push:
+    branches:
+      - tumisho/backend
+  
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  php-checks:
+    name: PHP Syntax Validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Display PHP version
+        run: php --version
+
+      - name: Validate PHP Syntax
+        shell: bash
+        run: |
+          set -e 
+
+          while IFS= read -r -d '' file; do
+            echo "Checking: $file"
+            php -l "$file"
+          done < <(find . \
+            -type d \( \
+              -name .git -o \
+              -name .github -o \
+              -name vendor \
+            \) -prune -o \
+            -type f -name '*.php' -print0)
+
+      - name: Confirm validation completed
+        run: echo "All PHP files passed syntax validation"
+ 

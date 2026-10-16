@@ -19,7 +19,7 @@ include '../includes/header.php';
 <aside id="adminMenu" class="admin-menu">
     <button class="close-small" onclick="closeAdminMenu()">×</button>
     <div class="menu-head"><div class="brand"><span class="logo">♡</span><div><strong>Abba House</strong><br><small>Admin page</small></div></div></div>
-    <a href="dashboard.php">▥ Dashboard</a><a href="register_orphan.php">♙ Register Orphan</a><a href="messages.php">✉ Visitor Messages</a>
+    <a href="dashboard.php">▥ Dashboard</a><a href="orphan_records.php">▤ Orphan Records</a><a href="register_orphan.php">♙ Register Orphan</a><a href="messages.php">✉️ Visitor Messages</a>
     <div class="admin-profile"><span>RB</span><div><b><?= $_SESSION['admin_name'] ?></b><br><small>admin@email.com</small></div><button onclick="showLogout()">⇥</button></div>
 </aside>
 <div id="adminOverlay" onclick="closeAdminMenu()"></div>
@@ -29,7 +29,7 @@ include '../includes/header.php';
         <div>
             <div class="horizontal-scroll stats-scroll">
                 <div class="stat-card"><p>Children Registered</p><h2><?= $total ?></h2><img src="../assets/images/children_registered_icon.png" width="30" height="30"></div>
-                <a class="stat-card" href="messages.php"><p>Visitor Messages</p><h2><?= $totalMessages ?></h2><span>✉</span></a>
+                <a class="stat-card" href="messages.php"><p>Visitor Messages</p><h2><?= $totalMessages ?></h2><span>✉️</span></a>
                 <div class="stat-card"><p>Present Today</p><h2><?= $todayPresent ?></h2><span>✓</span></div>
             </div>
         </div>

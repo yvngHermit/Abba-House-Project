@@ -12,7 +12,7 @@ include '../includes/header.php';
 <aside id="adminMenu" class="admin-menu">
     <button class="close-small" onclick="closeAdminMenu()">×</button>
     <div class="menu-head"><div class="brand"><span class="logo">♡</span><div><strong>Abba House</strong><br><small>Admin page</small></div></div></div>
-    <a href="dashboard.php">▥ Dashboard</a><a href="register_orphan.php">♙ Register Orphan</a><a href="messages.php">✉ Visitor Messages</a>
+    <a href="dashboard.php">▥ Dashboard</a><a href="orphan_records.php">▤ Orphan Records</a><a href="register_orphan.php">♙ Register Orphan</a><a href="messages.php">✉️ Visitor Messages</a>
     <div class="admin-profile"><span>RB</span><div><b><?= htmlspecialchars($_SESSION['admin_name']) ?></b><br><small>admin@email.com</small></div><button onclick="showLogout()">⇥</button></div>
 </aside>
 <div id="adminOverlay" onclick="closeAdminMenu()"></div>

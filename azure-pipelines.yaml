@@ -16,8 +16,10 @@ steps:
       php --version
     displayName: 'Display PHP version'
 
-  - script: |
+  
+  - bash: |
       set -e
+
       while IFS= read -r -d '' file; do
         echo "Checking: $file"
         php -l "$file"
@@ -25,4 +27,3 @@ steps:
         -type d \( -name .git -o -name .github -o -name vendor \) -prune -o \
         -type f -name '*.php' -print0)
     displayName: 'Validate PHP syntax'
-    shell: bash

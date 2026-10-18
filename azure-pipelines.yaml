@@ -1,0 +1,28 @@
+
+trigger:
+  branches:
+    include:
+      - main
+      - tumisho/backend
+      - lizwe/database
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+  - checkout: self
+
+  - script: |
+      php --version
+    displayName: 'Display PHP version'
+
+  - script: |
+      set -e
+      while IFS= read -r -d '' file; do
+        echo "Checking: $file"
+        php -l "$file"
+      done < <(find . \
+        -type d \( -name .git -o -name .github -o -name vendor \) -prune -o \
+        -type f -name '*.php' -print0)
+    displayName: 'Validate PHP syntax'
+    shell: bash

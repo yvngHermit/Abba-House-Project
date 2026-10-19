@@ -48,14 +48,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!filter_var($message['email'], FILTER_VALIDATE_EMAIL)) {
             $error = 'The saved contact email address is invalid. No email was sent.';
         } else {
-            $insert = $pdo->prepare("INSERT INTO contact_replies (contact_id, admin_id, reply_body, delivery_status) VALUES (?, ?, ?, 'Pending')");
-            $insert->execute([(int) $message['contact_id'], (int) $_SESSION['admin_id'], $replyBody]);
-            $replyId = (int) $pdo->lastInsertId();
+            $isAzure = getenv('DB_CONNECTION') === 'sqlsrv';
+
+            if ($isAzure) {
+                $insert = $pdo->prepare(
+                    "INSERT INTO contact_replies
+                        (contact_id, admin_id, reply_body, delivery_status)
+                    OUTPUT INSERTED.reply_id
+                    VALUES (?, ?, ?, 'Pending')"
+                );
+
+                $insert->execute([
+                    (int) $message['contact_id'],
+                    (int) $_SESSION['admin_id'],
+                    $replyBody
+                ]);
+
+                $replyId = (int) $insert->fetchColumn();
+            } else {
+                $insert = $pdo->prepare(
+                    "INSERT INTO contact_replies
+                        (contact_id, admin_id, reply_body, delivery_status)
+                    VALUES (?, ?, ?, 'Pending')"
+                );
+
+                $insert->execute([
+                    (int) $message['contact_id'],
+                    (int) $_SESSION['admin_id'],
+                    $replyBody
+                ]);
+
+                $replyId = (int) $pdo->lastInsertId();
+            }
 
             try {
                 require_once '../includes/mailer.php';
                 sendContactReply($message, $replyBody);
-                $update = $pdo->prepare("UPDATE contact_replies SET delivery_status = 'Sent', sent_at = NOW() WHERE reply_id = ?");
+                $update = $pdo->prepare(
+                    "UPDATE contact_replies
+                    SET delivery_status = 'Sent',
+                        sent_at = CURRENT_TIMESTAMP
+                    WHERE reply_id = ?"
+                );
+
                 $update->execute([$replyId]);
                 $_SESSION['message_reply_flash'] = 'Reply sent successfully to ' . $message['email'] . '.';
                 header('Location: message_view.php?id=' . (int) $message['contact_id']);

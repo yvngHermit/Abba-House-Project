@@ -1,4 +1,3 @@
-
 <?php
 
 $isAzure = getenv('DB_CONNECTION') === 'sqlsrv';

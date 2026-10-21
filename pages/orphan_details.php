@@ -21,8 +21,7 @@ if ($orphanId === '' || strlen($orphanId) > 10) {
                 has_disability, photo_path, birth_cert_path, record_status,
                 status_updated_at, created_at
          FROM orphans
-         WHERE orphan_id = :orphan_id
-         LIMIT 1'
+         WHERE orphan_id = :orphan_id'
     );
     $stmt->execute([':orphan_id' => $orphanId]);
     $orphan = $stmt->fetch(PDO::FETCH_ASSOC);

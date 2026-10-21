@@ -1,16 +1,112 @@
 <?php
-include '../includes/auth.php'; requireAdmin(); include '../includes/db.php';
-$search = $_GET['search'] ?? '';
+require_once '../includes/auth.php';
+requireAdmin();
+require_once '../includes/db.php';
+
+$isAzure = getenv('DB_CONNECTION') === 'sqlsrv';
+$search = trim((string) ($_GET['search'] ?? ''));
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['attendance'])) {
     foreach ($_POST['attendance'] as $orphanId => $status) {
-        $stmt = $pdo->prepare('INSERT INTO attendance (orphan_id, attendance_date, status) VALUES (?, CURDATE(), ?) ON DUPLICATE KEY UPDATE status = VALUES(status)');
-        $stmt->execute([$orphanId, $status]);
+        $orphanId = (string) $orphanId;
+
+        if (!in_array($status, ['Present', 'Absent'], true)) {
+            continue;
+        }
+
+        if ($isAzure) {
+            // Lock the matching date/child row while deciding to insert or update.
+            $pdo->beginTransaction();
+
+            try {
+                $check = $pdo->prepare(
+                    'SELECT attendance_id
+                     FROM attendance WITH (UPDLOCK, HOLDLOCK)
+                     WHERE orphan_id = ?
+                       AND attendance_date = CAST(GETDATE() AS DATE)'
+                );
+                $check->execute([$orphanId]);
+                $attendanceId = $check->fetchColumn();
+
+                if ($attendanceId !== false) {
+                    $stmt = $pdo->prepare(
+                        'UPDATE attendance SET status = ? WHERE attendance_id = ?'
+                    );
+                    $stmt->execute([$status, $attendanceId]);
+                } else {
+                    $stmt = $pdo->prepare(
+                        'INSERT INTO attendance (orphan_id, attendance_date, status)
+                         VALUES (?, CAST(GETDATE() AS DATE), ?)'
+                    );
+                    $stmt->execute([$orphanId, $status]);
+                }
+
+                $pdo->commit();
+            } catch (Throwable $e) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                throw $e;
+            }
+        } else {
+            $stmt = $pdo->prepare(
+                'INSERT INTO attendance (orphan_id, attendance_date, status)
+                 VALUES (?, CURDATE(), ?)
+                 ON DUPLICATE KEY UPDATE status = VALUES(status)'
+            );
+            $stmt->execute([$orphanId, $status]);
+        }
     }
+
+    header('Location: dashboard.php' .
+        (!empty($_GET['search']) ? '?search=' . urlencode($search) : ''));
+    exit();
 }
-$total = $pdo->query('SELECT COUNT(*) FROM orphans')->fetchColumn();
-$totalMessages = $pdo->query('SELECT COUNT(*) FROM contacts')->fetchColumn();
-$todayPresent = $pdo->query("SELECT COUNT(*) FROM attendance WHERE attendance_date = CURDATE() AND status = 'Present'")->fetchColumn();
-$stmt = $pdo->prepare("SELECT o.*, COALESCE(a.status, 'Absent') AS status FROM orphans o LEFT JOIN attendance a ON o.orphan_id = a.orphan_id AND a.attendance_date = CURDATE() WHERE o.full_name LIKE ? ORDER BY o.full_name");
+
+$total = (int) $pdo->query(
+    'SELECT COUNT(*) FROM orphans'
+)->fetchColumn();
+
+$totalMessages = (int) $pdo->query(
+    'SELECT COUNT(*) FROM contacts'
+)->fetchColumn();
+
+if ($isAzure) {
+    $todayPresent = (int) $pdo->query(
+        "SELECT COUNT(*) FROM attendance
+         WHERE attendance_date = CAST(GETDATE() AS DATE)
+           AND status = 'Present'"
+    )->fetchColumn();
+
+    $stmt = $pdo->prepare(
+        "SELECT o.*,
+                COALESCE(a.status, 'Absent') AS status
+         FROM orphans o
+         LEFT JOIN attendance a
+           ON o.orphan_id = a.orphan_id
+          AND a.attendance_date = CAST(GETDATE() AS DATE)
+         WHERE o.full_name LIKE ?
+         ORDER BY o.full_name"
+    );
+} else {
+    $todayPresent = (int) $pdo->query(
+        "SELECT COUNT(*) FROM attendance
+         WHERE attendance_date = CURDATE()
+           AND status = 'Present'"
+    )->fetchColumn();
+
+    $stmt = $pdo->prepare(
+        "SELECT o.*,
+                COALESCE(a.status, 'Absent') AS status
+         FROM orphans o
+         LEFT JOIN attendance a
+           ON o.orphan_id = a.orphan_id
+          AND a.attendance_date = CURDATE()
+         WHERE o.full_name LIKE ?
+         ORDER BY o.full_name"
+    );
+}
+
 $stmt->execute(['%' . $search . '%']);
 $orphans = $stmt->fetchAll(PDO::FETCH_ASSOC);
 include '../includes/header.php';

@@ -12,8 +12,34 @@ function uploadFile($field, $folder) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $photo = uploadFile('photo', 'orphans');
     $cert = uploadFile('birth_cert', 'certificates');
-    $stmt = $pdo->prepare('INSERT INTO orphans (orphan_id, full_name, gender, date_of_birth, date_of_enrollment, has_disability, photo_path, birth_cert_path, admin_id) VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?)');
-    $stmt->execute([$_POST['orphan_id'], $_POST['full_name'], $_POST['gender'], $_POST['date_of_birth'], $_POST['has_disability'], $photo, $cert, $_SESSION['admin_id']]);
+    $isAzure = getenv('DB_CONNECTION') === 'sqlsrv';
+
+    if ($isAzure) {
+        $sql = "INSERT INTO orphans
+            (orphan_id, full_name, gender, date_of_birth,
+            date_of_enrollment, has_disability, photo_path,
+            birth_cert_path, admin_id)
+            VALUES (?, ?, ?, ?, CAST(GETDATE() AS DATE), ?, ?, ?, ?)";
+    } else {
+        $sql = "INSERT INTO orphans
+            (orphan_id, full_name, gender, date_of_birth,
+            date_of_enrollment, has_disability, photo_path,
+            birth_cert_path, admin_id)
+            VALUES (?, ?, ?, ?, CURDATE(), ?, ?, ?, ?)";
+    }
+
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([
+        $_POST['orphan_id'],
+        trim($_POST['full_name']),
+        $_POST['gender'],
+        $_POST['date_of_birth'],
+        $_POST['has_disability'],
+        $photo,
+        $cert,
+        $_SESSION['admin_id']
+    ]);
+
     $success = 'Orphan registered successfully.';
 }
 $next = 'ORP' . str_pad(($pdo->query('SELECT COUNT(*) FROM orphans')->fetchColumn() + 1), 3, '0', STR_PAD_LEFT);

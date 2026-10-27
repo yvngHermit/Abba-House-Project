@@ -27,38 +27,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Your session could not be verified. Refresh the page and try again.';
     } else {
         $orphanId = trim((string) ($_POST['orphan_id'] ?? ''));
-        $newStatus = (string) ($_POST['new_status'] ?? '');
+        $action = (string) ($_POST['action'] ?? '');
 
-        if ($orphanId === '' || !in_array($newStatus, ['Active', 'Adopted', 'Deregistered'], true)) {
-            $error = 'The requested status change is invalid.';
-        } else {
+        if ($orphanId === '') {
+            $error = 'The requested orphan record is invalid.';
+        } elseif ($action === 'delete') {
             try {
-                $update = $pdo->prepare(
-                    'UPDATE orphans
-                     SET record_status = :record_status,
-                         status_updated_at = CURRENT_TIMESTAMP
-                     WHERE orphan_id = :orphan_id'
-                );
-                $update->execute([
-                    ':record_status' => $newStatus,
-                    ':orphan_id' => $orphanId,
-                ]);
+                $pdo->beginTransaction();
+                $find = $pdo->prepare('SELECT record_status, photo_path, birth_cert_path FROM orphans WHERE orphan_id = ?');
+                $find->execute([$orphanId]);
+                $record = $find->fetch(PDO::FETCH_ASSOC);
 
-                if ($update->rowCount() > 0) {
-                    $notice = 'Orphan status updated to ' . $statusLabels[$newStatus] . '.';
+                if (!$record) {
+                    $pdo->rollBack();
+                    $error = 'The selected orphan could not be found.';
+                } elseif ($record['record_status'] !== 'Deregistered') {
+                    $pdo->rollBack();
+                    $error = 'Only deregistered orphan records can be permanently deleted.';
                 } else {
-                    $check = $pdo->prepare('SELECT record_status FROM orphans WHERE orphan_id = ?');
-                    $check->execute([$orphanId]);
-                    $current = $check->fetchColumn();
-                    if ($current === false) {
-                        $error = 'The selected orphan could not be found.';
-                    } else {
-                        $notice = 'No status change was needed. This record is already ' . strtolower($statusLabels[$newStatus]) . '.';
+                    // Delete dependent attendance explicitly for compatibility with existing DB constraints.
+                    $deleteAttendance = $pdo->prepare('DELETE FROM attendance WHERE orphan_id = ?');
+                    $deleteAttendance->execute([$orphanId]);
+                    $deleteOrphan = $pdo->prepare("DELETE FROM orphans WHERE orphan_id = ? AND record_status = 'Deregistered'");
+                    $deleteOrphan->execute([$orphanId]);
+                    if ($deleteOrphan->rowCount() !== 1) {
+                        throw new RuntimeException('Orphan record was not deleted.');
                     }
+                    $pdo->commit();
+
+                    foreach ([
+                        ['path' => $record['photo_path'] ?? null, 'folder' => 'orphans'],
+                        ['path' => $record['birth_cert_path'] ?? null, 'folder' => 'certificates'],
+                    ] as $file) {
+                        $storedPath = $file['path'];
+                        $prefix = 'uploads/' . $file['folder'] . '/';
+                        if (is_string($storedPath) && strpos($storedPath, $prefix) === 0) {
+                            $filename = basename($storedPath);
+                            if ($filename !== '' && $filename !== '.' && $filename !== '..') {
+                                $diskPath = dirname(__DIR__) . '/' . $prefix . $filename;
+                                if (is_file($diskPath)) {
+                                    @unlink($diskPath);
+                                }
+                            }
+                        }
+                    }
+                    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+                    $notice = 'The deregistered orphan record was permanently deleted.';
                 }
-            } catch (PDOException $exception) {
-                error_log('Orphan status update failed: ' . $exception->getMessage());
-                $error = 'The status could not be updated. Please try again.';
+            } catch (Throwable $exception) {
+                if ($pdo->inTransaction()) {
+                    $pdo->rollBack();
+                }
+                error_log('Permanent orphan deletion failed: ' . $exception->getMessage());
+                $error = 'The record could not be deleted. Please try again.';
+            }
+        } else {
+            $newStatus = (string) ($_POST['new_status'] ?? '');
+            if (!in_array($newStatus, ['Active', 'Adopted', 'Deregistered'], true)) {
+                $error = 'The requested status change is invalid.';
+            } else {
+                try {
+                    $update = $pdo->prepare(
+                        'UPDATE orphans
+                         SET record_status = :record_status,
+                             status_updated_at = CURRENT_TIMESTAMP
+                         WHERE orphan_id = :orphan_id'
+                    );
+                    $update->execute([':record_status' => $newStatus, ':orphan_id' => $orphanId]);
+                    if ($update->rowCount() > 0) {
+                        $notice = 'Orphan status updated to ' . $statusLabels[$newStatus] . '.';
+                    } else {
+                        $check = $pdo->prepare('SELECT record_status FROM orphans WHERE orphan_id = ?');
+                        $check->execute([$orphanId]);
+                        $current = $check->fetchColumn();
+                        if ($current === false) {
+                            $error = 'The selected orphan could not be found.';
+                        } else {
+                            $notice = 'No status change was needed. This record is already ' . strtolower($statusLabels[$newStatus]) . '.';
+                        }
+                    }
+                } catch (PDOException $exception) {
+                    error_log('Orphan status update failed: ' . $exception->getMessage());
+                    $error = 'The status could not be updated. Please try again.';
+                }
             }
         }
     }
@@ -118,7 +169,7 @@ include '../includes/header.php';
     <section class="records-heading">
         <p class="section-label">CHILD MANAGEMENT</p>
         <h1>Orphan Records</h1>
-        <p>Search and manage registered children. Adoption and deregistration update the record status without deleting the child's history or documents.</p>
+        <p>Search and manage registered children. Adoption and deregistration preserve the record. Permanently deleting a deregistered record removes its attendance history and uploaded documents.</p>
     </section>
 
     <?php if ($notice !== ''): ?><p class="success" role="status"><?= h($notice) ?></p><?php endif; ?>
@@ -190,7 +241,7 @@ include '../includes/header.php';
                                                 <button type="submit">Deregister</button>
                                             </form>
                                         <?php endif; ?>
-                                        <?php if ($orphan['record_status'] !== 'Active'): ?>
+                                        <?php if ($orphan['record_status'] !== 'Active' && $orphan['record_status'] !== 'Deregistered'): ?>
                                             <form method="post" onsubmit="return confirm('Restore this child to Active status?');">
                                                 <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
                                                 <input type="hidden" name="orphan_id" value="<?= h($orphan['orphan_id']) ?>">
@@ -198,6 +249,14 @@ include '../includes/header.php';
                                                 <button type="submit">Restore to active</button>
                                             </form>
                                         <?php endif; ?>
+                                    <?php if ($orphan['record_status'] === 'Deregistered'): ?>
+                                        <form method="post" onsubmit="return confirm('PERMANENTLY DELETE this deregistered orphan record, its attendance history, photograph, and birth certificate? This cannot be undone.');">
+                                            <input type="hidden" name="csrf_token" value="<?= h($_SESSION['csrf_token']) ?>">
+                                            <input type="hidden" name="orphan_id" value="<?= h($orphan['orphan_id']) ?>">
+                                            <input type="hidden" name="action" value="delete">
+                                            <button class="record-action-delete" type="submit">Permanently delete</button>
+                                        </form>
+                                    <?php endif; ?>
                                     </div>
                                 </details>
                             </td>

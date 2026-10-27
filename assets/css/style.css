@@ -120,3 +120,13 @@
 .reply-status.status-failed{background:#ffe5e5;color:#842029}
 .reply-status.status-pending{background:#fff3cd;color:#664d03}
 @media(max-width:520px){.message-reply-card,.message-reply-history{padding:18px}.reply-form button{width:100%}.reply-history-heading{align-items:flex-start}}
+
+/* Orphan registration upload preview */
+.upload-preview-box{position:relative;overflow:hidden;cursor:pointer;gap:8px;padding:12px;text-align:center}
+.upload-preview-box input[type="file"]{display:none}
+.upload-preview-image{display:block;width:100%;height:100%;max-height:110px;object-fit:contain;border-radius:5px}
+.upload-preview-prompt{font-size:18px!important;line-height:1.4;text-align:center}
+.upload-preview-prompt[hidden],.upload-preview-image[hidden]{display:none!important}
+.upload-file-status{display:block;overflow-wrap:anywhere;margin:-6px 0 14px;color:#666;font-size:12px}
+.record-action-options .record-action-delete{color:#b42318;font-weight:700}
+.record-action-options .record-action-delete:hover{background:#fff0f0}

@@ -56,9 +56,61 @@ include '../includes/header.php';
         <label>Date of Birth</label><input type="date" name="date_of_birth" required>
         <label>Date of enrollment</label><input value="<?= date('d F Y') ?>" readonly><small>Enrollment date is automatically set to today’s date automatically</small>
         <label>Does the child have any disability?</label><div class="radio-row"><label><input type="radio" name="has_disability" value="Yes" required> yes</label><label><input type="radio" name="has_disability" value="No"> No</label></div>
-        <label>Orphan Picture</label><label class="upload-box">▧<br><span>⇩ Upload Photo</span><input type="file" name="photo" accept="image/*"></label>
-        <label>Birth Certificate</label><label class="upload-box">▧<br><span>⇩ Upload Photo</span><input type="file" name="birth_cert" accept="image/*,.pdf"></label>
+        <label for="orphanPhoto">Orphan Picture</label>
+        <label class="upload-box upload-preview-box" for="orphanPhoto">
+            <img id="orphanPhotoPreview" class="upload-preview-image" alt="Selected orphan photo preview" hidden>
+            <span id="orphanPhotoPrompt" class="upload-preview-prompt">▧<br>⇧ Choose Photo</span>
+            <input id="orphanPhoto" type="file" name="photo" accept="image/*">
+        </label>
+        <small id="orphanPhotoStatus" class="upload-file-status" aria-live="polite">No photo selected.</small>
+        <label for="birthCertificate">Birth Certificate</label>
+        <label class="upload-box upload-preview-box" for="birthCertificate">
+            <span id="birthCertificatePrompt" class="upload-preview-prompt">▤<br>⇧ Choose Certificate</span>
+            <input id="birthCertificate" type="file" name="birth_cert" accept="image/*,.pdf">
+        </label>
+        <small id="birthCertificateStatus" class="upload-file-status" aria-live="polite">No certificate selected.</small>
         <button class="orange-btn full">♙ Register Orphan</button>
     </form>
 </main>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const photoInput = document.getElementById('orphanPhoto');
+    const photoPreview = document.getElementById('orphanPhotoPreview');
+    const photoPrompt = document.getElementById('orphanPhotoPrompt');
+    const photoStatus = document.getElementById('orphanPhotoStatus');
+    let currentPhotoUrl = null;
+
+    photoInput?.addEventListener('change', function () {
+        const file = this.files && this.files[0];
+        if (currentPhotoUrl) URL.revokeObjectURL(currentPhotoUrl);
+        currentPhotoUrl = null;
+        if (!file) {
+            photoPreview.hidden = true;
+            photoPreview.removeAttribute('src');
+            photoPrompt.hidden = false;
+            photoStatus.textContent = 'No photo selected.';
+            return;
+        }
+        if (!file.type.startsWith('image/')) {
+            this.value = '';
+            photoPreview.hidden = true;
+            photoPrompt.hidden = false;
+            photoStatus.textContent = 'Please choose an image file.';
+            return;
+        }
+        currentPhotoUrl = URL.createObjectURL(file);
+        photoPreview.src = currentPhotoUrl;
+        photoPreview.hidden = false;
+        photoPrompt.hidden = true;
+        photoStatus.textContent = file.name;
+    });
+
+    const certificateInput = document.getElementById('birthCertificate');
+    certificateInput?.addEventListener('change', function () {
+        const file = this.files && this.files[0];
+        document.getElementById('birthCertificateStatus').textContent = file ? file.name : 'No certificate selected.';
+        document.getElementById('birthCertificatePrompt').innerHTML = file ? '✓<br>Certificate selected' : '▤<br>⇧ Choose Certificate';
+    });
+});
+</script>
 <?php include '../includes/footer.php'; ?>

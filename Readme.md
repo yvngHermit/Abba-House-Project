@@ -9,6 +9,10 @@
 </div>
 
 ---
+## Links
+
+Video link: https://1drv.ms/v/c/45d47dd60ec206b3/IQDw7CVoOOF5SaexdNlTRemlAUiz8K-8cDplk5AenCcR9Qo?e=RyKgb5
+Azure DevOps: https://dev.azure.com/ST10440119/XISD%20Group%205%20Project
 
 ## 1. Project Overview
 
